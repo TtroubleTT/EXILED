@@ -76,9 +76,8 @@ namespace Exiled.CustomItems.API.Features
             if (!Attachments.IsEmpty())
                 firearm.AddAttachment(Attachments);
 
-            firearm.MagazineAmmo = ClipSize;
-            firearm.MaxMagazineAmmo = ClipSize;
-
+            // firearm.MagazineAmmo = ClipSize;
+            // firearm.MaxMagazineAmmo = ClipSize;
             Pickup? pickup = firearm.CreatePickup(position);
 
             if (pickup is null)
@@ -105,7 +104,8 @@ namespace Exiled.CustomItems.API.Features
                     firearm.AddAttachment(Attachments);
 
                 int ammo = firearm.MagazineAmmo;
-                firearm.MaxMagazineAmmo = ClipSize;
+
+                // firearm.MaxMagazineAmmo = ClipSize;
                 Log.Debug($"{nameof(Name)}.{nameof(Spawn)}: Spawning weapon with {ammo} ammo.");
                 Pickup? pickup = firearm.CreatePickup(position);
                 pickup.Scale = Scale;
@@ -130,8 +130,8 @@ namespace Exiled.CustomItems.API.Features
                 if (!Attachments.IsEmpty())
                     firearm.AddAttachment(Attachments);
 
-                firearm.MagazineAmmo = ClipSize;
-                firearm.MaxMagazineAmmo = ClipSize;
+                // firearm.MagazineAmmo = ClipSize;
+                // firearm.MaxMagazineAmmo = ClipSize;
             }
 
             Log.Debug($"{nameof(Give)}: Adding {item.Serial} to tracker.");
@@ -143,7 +143,6 @@ namespace Exiled.CustomItems.API.Features
         /// <inheritdoc/>
         protected override void SubscribeEvents()
         {
-            Exiled.Events.Handlers.Player.ReloadingWeapon += OnInternalReloading;
             Exiled.Events.Handlers.Player.Shooting += OnInternalShooting;
             Exiled.Events.Handlers.Player.Shot += OnInternalShot;
             Exiled.Events.Handlers.Player.Hurting += OnInternalHurting;
@@ -154,7 +153,6 @@ namespace Exiled.CustomItems.API.Features
         /// <inheritdoc/>
         protected override void UnsubscribeEvents()
         {
-            Exiled.Events.Handlers.Player.ReloadingWeapon -= OnInternalReloading;
             Exiled.Events.Handlers.Player.Shooting -= OnInternalShooting;
             Exiled.Events.Handlers.Player.Shot -= OnInternalShot;
             Exiled.Events.Handlers.Player.Hurting -= OnInternalHurting;
