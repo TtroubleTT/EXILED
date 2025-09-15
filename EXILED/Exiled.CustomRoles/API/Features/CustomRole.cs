@@ -17,6 +17,7 @@ namespace Exiled.CustomRoles.API.Features
     using Exiled.API.Extensions;
     using Exiled.API.Features;
     using Exiled.API.Features.Attributes;
+    using Exiled.API.Features.Items;
     using Exiled.API.Features.Pools;
     using Exiled.API.Features.Roles;
     using Exiled.API.Features.Spawn;
@@ -38,6 +39,9 @@ namespace Exiled.CustomRoles.API.Features
     public abstract class CustomRole
     {
         private const float AddRoleDelay = 0.25f;
+
+        // used in AddRole and InternalChangingRole
+        private static bool skipChangingCheck;
 
         private static Dictionary<Type, CustomRole?> typeLookupTable = new();
 
@@ -286,6 +290,37 @@ namespace Exiled.CustomRoles.API.Features
         /// <summary>
         /// Registers all the <see cref="CustomRole"/>'s present in the current assembly.
         /// </summary>
+        /// <param name="byAttribute">Whether to register by attribute.</param>
+        /// <returns>A <see cref="IEnumerable{T}"/> of <see cref="CustomRole"/> which contains all registered <see cref="CustomRole"/>'s.</returns>
+        /// <remarks>
+        /// This is just a dumbed down version of <see cref="RegisterRoles(bool, object?)"/> for QoL, if you actually use <see cref="CustomRoleAttribute"/>, do not use this overload.
+        /// </remarks>
+        public static IEnumerable<CustomRole> RegisterRoles(bool byAttribute = false)
+        {
+            if (byAttribute)
+            {
+                return RegisterRoles(false, null);
+            }
+
+            List<CustomRole> roles = new();
+
+            foreach (Type type in Assembly.GetCallingAssembly().GetTypes())
+            {
+                if (type.IsAbstract || !type.IsSubclassOf(typeof(CustomRole)))
+                    continue;
+
+                CustomRole role = (CustomRole)Activator.CreateInstance(type);
+
+                if (role.TryRegister())
+                    roles.Add(role);
+            }
+
+            return roles;
+        }
+
+        /// <summary>
+        /// Registers all the <see cref="CustomRole"/>'s present in the current assembly.
+        /// </summary>
         /// <param name="skipReflection">Whether reflection is skipped (more efficient if you are not using your custom item classes as config objects).</param>
         /// <param name="overrideClass">The class to search properties for, if different from the plugin's config class.</param>
         /// <returns>A <see cref="IEnumerable{T}"/> of <see cref="CustomRole"/> which contains all registered <see cref="CustomRole"/>'s.</returns>
@@ -516,19 +551,27 @@ namespace Exiled.CustomRoles.API.Features
 
             if (Role != RoleTypeId.None)
             {
-                if (KeepPositionOnSpawn)
+                try
                 {
-                    if (KeepInventoryOnSpawn)
-                        player.Role.Set(Role, SpawnReason.ForceClass, RoleSpawnFlags.None);
+                    skipChangingCheck = true;
+                    if (KeepPositionOnSpawn)
+                    {
+                        if (KeepInventoryOnSpawn)
+                            player.Role.Set(Role, SpawnReason.ForceClass, RoleSpawnFlags.None);
+                        else
+                            player.Role.Set(Role, SpawnReason.ForceClass, RoleSpawnFlags.AssignInventory);
+                    }
                     else
-                        player.Role.Set(Role, SpawnReason.ForceClass, RoleSpawnFlags.AssignInventory);
+                    {
+                        if (KeepInventoryOnSpawn && player.IsAlive)
+                            player.Role.Set(Role, SpawnReason.ForceClass, RoleSpawnFlags.UseSpawnpoint);
+                        else
+                            player.Role.Set(Role, SpawnReason.ForceClass, RoleSpawnFlags.All);
+                    }
                 }
-                else
+                finally
                 {
-                    if (KeepInventoryOnSpawn && player.IsAlive)
-                        player.Role.Set(Role, SpawnReason.ForceClass, RoleSpawnFlags.UseSpawnpoint);
-                    else
-                        player.Role.Set(Role, SpawnReason.ForceClass, RoleSpawnFlags.All);
+                    skipChangingCheck = false;
                 }
             }
 
@@ -547,7 +590,14 @@ namespace Exiled.CustomRoles.API.Features
                     foreach (string itemName in Inventory)
                     {
                         Log.Debug($"{Name}: Adding {itemName} to inventory.");
-                        TryAddItem(player, itemName);
+                        if (TryAddItem(player, itemName) && CustomItem.TryGet(itemName, out CustomItem? customItem) && customItem is CustomWeapon customWeapon)
+                        {
+                            if (player.CurrentItem is Firearm firearm && !customWeapon.Attachments.IsEmpty())
+                            {
+                                firearm.AddAttachment(customWeapon.Attachments);
+                                Log.Debug($"{Name}: Applied attachments to {itemName}.");
+                            }
+                        }
                     }
 
                     if (Ammo.Count > 0)
@@ -567,10 +617,14 @@ namespace Exiled.CustomRoles.API.Features
             player.Scale = Scale;
             if (Gravity.HasValue && player.Role is FpcRole fpcRole)
                 fpcRole.Gravity = Gravity.Value;
-            Vector3 position = GetSpawnPosition();
-            if (position != Vector3.zero)
+
+            if (!KeepPositionOnSpawn)
             {
-                player.Position = position;
+                Vector3 position = GetSpawnPosition();
+                if (position != Vector3.zero)
+                {
+                    player.Position = position;
+                }
             }
 
             Log.Debug($"{Name}: Setting player info");
@@ -952,8 +1006,10 @@ namespace Exiled.CustomRoles.API.Features
 
         private void OnInternalChangingRole(ChangingRoleEventArgs ev)
         {
-            if (ev.IsAllowed && ev.Reason != SpawnReason.Destroyed && Check(ev.Player) && ((ev.NewRole == RoleTypeId.Spectator && !KeepRoleOnDeath) || (ev.NewRole != RoleTypeId.Spectator && !KeepRoleOnChangingRole)))
+            if (!skipChangingCheck && ev.IsAllowed && ev.Reason != SpawnReason.Destroyed && Check(ev.Player) && ((ev.NewRole == RoleTypeId.Spectator && !KeepRoleOnDeath) || (ev.NewRole != RoleTypeId.Spectator && !KeepRoleOnChangingRole)))
                 RemoveRole(ev.Player);
+            else
+                skipChangingCheck = false;
         }
 
         private void OnSpawningRagdoll(SpawningRagdollEventArgs ev)
