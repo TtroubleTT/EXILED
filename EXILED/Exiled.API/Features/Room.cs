@@ -541,7 +541,7 @@ namespace Exiled.API.Features
         private static string TryRemovePostfixes(string str)
         {
             if (HolidayUtils.IsAnyHolidayActive())
-                str.Replace(HolidayUtils.GetActiveHoliday().ToString(), string.Empty).TrimEnd();
+                return str.Replace(HolidayUtils.GetActiveHoliday().ToString(), string.Empty).TrimEnd();
             return str;
         }
     }
