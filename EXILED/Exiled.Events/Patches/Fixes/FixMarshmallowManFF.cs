@@ -20,6 +20,7 @@ namespace Exiled.Events.Patches.Fixes
     using InventorySystem.Items.ThrowableProjectiles;
     using Mirror;
     using PlayerRoles;
+    using PlayerRoles.FirstPersonControl;
     using PlayerStatsSystem;
     using Respawning.NamingRules;
     using Subtitles;
@@ -33,17 +34,19 @@ namespace Exiled.Events.Patches.Fixes
     internal class FixMarshmallowManFF : AttackerDamageHandler
     {
 #pragma warning disable SA1600 // Elements should be documented
-        public FixMarshmallowManFF(MarshmallowItem marshmallowItem)
+        public FixMarshmallowManFF(MarshmallowItem marshmallowItem, bool isEvilMode)
         {
-            Attacker = new Footprint(marshmallowItem.Owner);
+            MarshmallowItem = marshmallowItem;
+            Attacker = new(marshmallowItem.Owner);
             Damage = marshmallowItem._attackDamage;
-            AllowSelfDamage = false;
-            ServerLogsText = "MarshmallowManFF Fix";
+            ForceFullFriendlyFire = isEvilMode;
         }
+
+        public MarshmallowItem MarshmallowItem { get; set; }
 
         public override Footprint Attacker { get; set; }
 
-        public override bool AllowSelfDamage { get; }
+        public override bool AllowSelfDamage { get; } = false;
 
         public override float Damage { get; set; }
 
@@ -60,7 +63,7 @@ namespace Exiled.Events.Patches.Fixes
 
         public override string DeathScreenText { get; } = DeathTranslations.MarshmallowMan.DeathscreenTranslation;
 
-        public override string ServerLogsText { get; }
+        public override string ServerLogsText => "Stabbed with Marshmallow Item by " + Attacker.Nickname;
 #pragma warning restore SA1600 // Elements should be documented
 #pragma warning disable SA1313 // Parameter names should begin with lower-case letter
 
@@ -71,7 +74,13 @@ namespace Exiled.Events.Patches.Fixes
             int index = newInstructions.FindIndex(instruction => instruction.Calls(PropertyGetter(typeof(MarshmallowItem), nameof(MarshmallowItem.NewDamageHandler))));
 
             // replace the getter for NewDamageHandler with ctor of FixMarshmallowManFF
-            newInstructions[index] = new CodeInstruction(OpCodes.Newobj, Constructor(typeof(FixMarshmallowManFF), new[] { typeof(MarshmallowItem) }));
+            newInstructions.RemoveAt(index);
+            newInstructions.InsertRange(index, new List<CodeInstruction>
+            {
+                new(OpCodes.Ldarg_0),
+                new(OpCodes.Callvirt, PropertyGetter(typeof(MarshmallowItem), nameof(MarshmallowItem.EvilMode))),
+                new(OpCodes.Newobj, Constructor(typeof(FixMarshmallowManFF), new[] { typeof(MarshmallowItem), typeof(bool) })),
+            });
 
             for (int z = 0; z < newInstructions.Count; z++)
                 yield return newInstructions[z];
