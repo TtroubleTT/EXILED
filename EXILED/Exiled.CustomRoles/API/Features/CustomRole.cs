@@ -552,6 +552,7 @@ namespace Exiled.CustomRoles.API.Features
         {
             Log.Debug($"{Name}: Adding role to {player.Nickname}.");
             player.UniqueRole = Name;
+            TrackedPlayers.Add(player);
 
             if (Role != RoleTypeId.None)
             {
@@ -580,7 +581,6 @@ namespace Exiled.CustomRoles.API.Features
             }
 
             player.UniqueRole = Name;
-            TrackedPlayers.Add(player);
 
             Timing.CallDelayed(
                 AddRoleDelay,
