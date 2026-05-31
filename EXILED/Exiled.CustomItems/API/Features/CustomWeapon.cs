@@ -69,16 +69,11 @@ namespace Exiled.CustomItems.API.Features
         /// <inheritdoc />
         public override Pickup? Spawn(Vector3 position, Player? previousOwner = null)
         {
-            if (!Type.IsWeapon(false))
+            if (Item.Create(Type) is not Firearm firearm)
             {
                 Log.Debug($"{nameof(Spawn)}: Item is not Firearm.");
                 return null;
             }
-
-            Firearm firearm = Item.Create<Firearm>(Type);
-
-            if (ClipSize > 0)
-                firearm.MaxMagazineAmmo = ClipSize;
 
             if (!Attachments.IsEmpty())
                 firearm.AddAttachment(Attachments);
@@ -108,9 +103,6 @@ namespace Exiled.CustomItems.API.Features
         {
             if (item is Firearm firearm)
             {
-                if (ClipSize > 0)
-                    firearm.MaxMagazineAmmo = ClipSize;
-
                 if (!Attachments.IsEmpty())
                     firearm.AddAttachment(Attachments);
 
@@ -139,9 +131,6 @@ namespace Exiled.CustomItems.API.Features
 
             if (item is Firearm firearm)
             {
-                if (ClipSize > 0)
-                    firearm.MaxMagazineAmmo = ClipSize;
-
                 if (!Attachments.IsEmpty())
                     firearm.AddAttachment(Attachments);
 
@@ -153,19 +142,6 @@ namespace Exiled.CustomItems.API.Features
             TrackedSerials.Add(item.Serial);
 
             OnAcquired(player, item, displayMessage);
-        }
-
-        /// <inheritdoc/>
-        protected override void OnAcquired(Player player, Item item, bool displayMessage)
-        {
-            // MaxMagazineAmmo writes to MagazineModule._defaultCapacity, which is per-instance state and is not
-            // carried over when the item is re-created (e.g. dropped and picked back up). Re-assert it here so the
-            // custom ClipSize survives every base-game capacity clamp (reload, attachment changes) no matter how
-            // the weapon entered the inventory.
-            if (ClipSize > 0 && item is Firearm firearm)
-                firearm.MaxMagazineAmmo = ClipSize;
-
-            base.OnAcquired(player, item, displayMessage);
         }
 
         /// <inheritdoc/>
